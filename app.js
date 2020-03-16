@@ -4,7 +4,9 @@ const ejs = require('ejs');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const encrypt = require('mongoose-encryption');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
+const saltRound = 10;
 
 const app = express();
 
@@ -17,7 +19,7 @@ app.use(
 );
 
 // Connect to local MONGODB
-mongoose.connect('mongodb://localhost:27017/userDB', {
+mongoose.connect(process.env.DB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
@@ -46,21 +48,26 @@ app.get('/register', (req, res) => {
   res.render('register');
 });
 
-app.post('/register', (req, res) => {
-  const newUser = new user({
-    email: req.body.username,
-    password: req.body.password
-  });
+// Registring the user
 
-  newUser.save(function(err) {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render('secrets');
-    }
+app.post('/register', (req, res) => {
+  bcrypt.hash(req.body.password, saltRound, function(err, hash) {
+    const newUser = new user({
+      email: req.body.username,
+      password: hash
+    });
+
+    newUser.save(function(err) {
+      if (err) {
+        console.log(err);
+      } else {
+        res.render('secrets');
+      }
+    });
   });
 });
 
+// Login the user
 app.post('/login', (req, res) => {
   const username = req.body.username;
   const password = req.body.password;
@@ -70,9 +77,11 @@ app.post('/login', (req, res) => {
       console.log(err);
     } else {
       if (founded) {
-        if (founded.password === password) {
-          res.render('secrets');
-        }
+        bcrypt.compare(password, founded.password, function(err, result) {
+          if (result === true) {
+            res.render('secrets');
+          }
+        });
       }
     }
   });
